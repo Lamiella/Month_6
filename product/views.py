@@ -72,7 +72,10 @@ class ProductListCreateAPIView(ListCreateAPIView):
     permission_classes = [IsOwner | IsAnonymous | IsModerator]
 
     def post(self, request, *args, **kwargs):
-        serializer = ProductValidateSerializer(data=request.data)
+        serializer = ProductValidateSerializer(
+            data=request.data,
+            context={'user': request.user}
+        )
         serializer.is_valid(raise_exception=True)
 
         # Get validated data
