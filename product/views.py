@@ -6,7 +6,6 @@ from rest_framework.generics import ListCreateAPIView, RetrieveUpdateDestroyAPIV
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.viewsets import ModelViewSet
 from rest_framework.views import APIView
-
 from .models import Category, Product, Review
 from .serializers import (
     CategorySerializer,
@@ -18,6 +17,8 @@ from .serializers import (
     ReviewValidateSerializer
 )
 from common.permissions import IsOwner, IsAnonymous, CanEditWithIn15Minutes, IsModerator
+from django.core.cache import cache
+
 
 PAGE_SIZE = 5
 
@@ -95,6 +96,22 @@ class ProductListCreateAPIView(ListCreateAPIView):
 
         return Response(data=ProductSerializer(product).data,
                         status=status.HTTP_201_CREATED)
+
+    def get(self, request, *args, **kwargs):
+        # Получаем данные из кэша по ключу 'list_of_product' без обращения к БД
+        cached_data = cache.get('list_of_product')
+        # Если кэш найден, возвращаем ответ
+        if cached_data:
+            return Response(data=cached_data, status=status.HTTP_200_OK)
+
+        # Если данных в кэше нет, вызываем обычный GET-метод
+        response = super().get(request, *args, **kwargs)
+
+        # Проверяем, что ответ не пустой
+        if response.data.get("total", 0) > 0:
+            cache.set("list_of_product", response.data, timeout=60)
+
+        return response
 
 
 class ProductDetailAPIView(RetrieveUpdateDestroyAPIView):
