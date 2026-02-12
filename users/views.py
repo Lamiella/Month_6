@@ -18,6 +18,7 @@ import string
 from .models import CustomUser
 from rest_framework_simplejwt.views import TokenObtainPairView
 from django.core.cache import cache
+from users.tasks import add, send_otp, send_welcome_email, logs_user_login
 
 
 class CustomTokenObtainPairView(TokenObtainPairView):
@@ -32,6 +33,9 @@ class AuthorizationAPIView(CreateAPIView):
         serializer.is_valid(raise_exception=True)
 
         user = authenticate(**serializer.validated_data)
+
+        add.delay(2,5)
+        logs_user_login.delay(user.email)
 
         if user:
             if not user.is_active:
@@ -73,6 +77,9 @@ class RegistrationAPIView(CreateAPIView):
             # Создаём код в кэше, который действует 5 мин
             redis_key = f"confirmation_code:{user.id}"
             cache.set(redis_key, code, timeout=300)
+
+            send_otp.delay(email, code)
+            send_welcome_email.delay(email)
 
         return Response(
             status=status.HTTP_201_CREATED,
